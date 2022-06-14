@@ -1,23 +1,30 @@
 import numpy as np
 from collections import defaultdict
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold
+from sklearn.naive_bayes import MultinomialNB
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import classification_report
+from sklearn.metrics import roc_auc_score
 
 data_path = 'datastore/movie-rating-data/ratings.csv'
 n_users = 6040
 n_movies = 9724
 
 
-def load_rating_data(data_path, n_users, n_movies):
+def load_rating_data(file_path: str, num_user: int, num_movies: int) -> tuple:
     """
-    :param data_path: path of data file
-    :param n_users: number of users
-    :param n_movies: number of movies with ratings
+    :param file_path: path of data file
+    :param num_user: number of users
+    :param num_movies: number of movies with ratings
     :return: rating data of numpy array[user, movie]
     """
-    data = np.zeros([n_users, n_movies], dtype=np.float32)
+    data = np.zeros([num_user, num_movies], dtype=np.float32)
     movie_id_mapping = {}
     movie_n_rating = defaultdict(int)
-    with open(data_path, 'r') as file:
+    with open(file_path, 'r') as file:
         for line in file.readlines()[1:]:
             user_id, movie_id, rating, _ = line.split(",")
             user_id = int(user_id) - 1
@@ -29,7 +36,7 @@ def load_rating_data(data_path, n_users, n_movies):
                 raise ValueError(f"Expected number got {rating}, Trace: {e}")
             internal_movie_id = movie_id_mapping[movie_id]
             print(f"Adding movie id {movie_id} to user id {user_id} with internal user id {internal_movie_id}")
-            if internal_movie_id < n_movies:
+            if internal_movie_id < num_movies:
                 data[user_id, movie_id_mapping[movie_id]] = rating
             if rating > 0.0:
                 movie_n_rating[movie_id] += 1
@@ -41,7 +48,7 @@ def load_rating_data(data_path, n_users, n_movies):
 t_data, t_movie_n_rating, t_movie_id_mapping = load_rating_data(data_path, n_users, n_movies)
 
 
-def display_distribution(data):
+def display_distribution(data: np.array) -> None:
     values, counts = np.unique(data, return_counts=True)
     for value, count in zip(values, counts):
         print(f'Number of ratings {int(value)}:{count}')
@@ -72,8 +79,6 @@ print(f'{n_pos} positive samples and {n_neg} negative samples')
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 print(len(Y_train), len(Y_test))
 
-
-from sklearn.naive_bayes import MultinomialNB
 clf = MultinomialNB(alpha=1.0, fit_prior=True)
 clf.fit(X_train, Y_train)
 prediction_prob = clf.predict_proba(X_test)
@@ -85,16 +90,15 @@ print(prediction[:10])
 accuracy = clf.score(X_test, Y_test)
 print(f'The accuracy is: {accuracy*100:.1f}%')
 
-from sklearn.metrics import confusion_matrix
-print(confusion_matrix(Y_test, prediction, labels=[0,1]))
 
-from sklearn.metrics import precision_score, recall_score, f1_score
+print(confusion_matrix(Y_test, prediction, labels=[0, 1]))
+
 precision_score(Y_test, prediction, pos_label=1)
 recall_score(Y_test, prediction, pos_label=1)
 f1_score(Y_test, prediction, pos_label=1)
 f1_score(Y_test, prediction, pos_label=0)
 
-from sklearn.metrics import classification_report
+
 report = classification_report(Y_test, prediction)
 print(report)
 
@@ -118,12 +122,10 @@ true_pos_rate = [tp / n_pos_test for tp in true_pos]
 false_pos_rate = [fp / n_neg_test for fp in false_pos]
 
 
-import matplotlib.pyplot as plt
-
 plt.figure()
 lw = 2
 plt.plot(false_pos_rate, true_pos_rate, color='darkorange', lw=lw)
-plt.plot([0,1], [0,1], color='navy', lw=lw, linestyle='--')
+plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
 plt.xlim([0.0, 1.0])
 plt.ylim([0.0, 1.05])
 plt.xlabel('False positive rate')
@@ -132,10 +134,10 @@ plt.title('Receiver Operating Characterestics')
 plt.legend(loc="lower right")
 plt.show()
 
-from sklearn.metrics import roc_auc_score
+
 roc_auc_score(Y_test, pos_prob)
 
-from sklearn.model_selection import StratifiedKFold
+
 k = 5
 k_fold = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
 
@@ -145,8 +147,8 @@ auc_record = {}
 
 for train_indices, test_indices in k_fold.split(X, Y):
     X_train, X_test = X[train_indices], X[test_indices]
-    Y_train, Y_train = Y[train_indices], Y[test_indices]
-    for  alpha in smoothing_factor_option:
+    Y_train, Y_test = Y[train_indices], Y[test_indices]
+    for alpha in smoothing_factor_option:
         if alpha not in auc_record:
             auc_record[alpha] = {}
             for fit_prior in fit_prior_option:
@@ -159,8 +161,8 @@ for train_indices, test_indices in k_fold.split(X, Y):
 
 
 for smoothing, smoothing_record in auc_record.items():
-    for fit_prior, auc in smoothing_record.item():
-        print(f'{smoothing}     {fit_prior}     {auc/k:.5f}')
+    for fit_prior, auc in smoothing_record.items():
+        print(f'{smoothing}\t{fit_prior}\t{auc/k:.5f}')
 
 clf = MultinomialNB(alpha=2.0, fit_prior=False)
 clf.fit(X_train, Y_train)
