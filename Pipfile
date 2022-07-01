@@ -9,6 +9,7 @@ scikit-learn = "==1.1.1"
 matplotlib = "==3.5.2"
 pandas = "==1.4.2"
 xlrd = "*"
+graphviz = "*"
 
 [dev-packages]
 
